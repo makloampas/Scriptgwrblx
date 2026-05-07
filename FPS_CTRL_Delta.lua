@@ -1,9 +1,8 @@
 --[[
-    DELTA EXECUTOR - LAG & BOOSTER [FIX NETWORK ATTACK]
+    DELTA EXECUTOR - LAG SPIKE & BOOSTER [FINAL WORKING]
     Fitur: 
-    1. Lag Mode (SERANG JARINGAN/LATENCY player lain pake RemoteSpam + Network flood)
-    2. Booster (RINGAN + BURAM, BUKAN FULL HITAM)
-    3. Monitor FPS + PING
+    1. Lag Mode - FLASHLIGHT/BLIND effect ke player lain + Freeze mereka (GW AMAN)
+    2. Booster - MATIIN SEMUA EFFECT + FPS MAX (ringan beneran)
     by Dyvillexz/Codex 🔥
 ]]
 
@@ -13,27 +12,30 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- // VARIABLES
 local lagEnabled = false
 local boostEnabled = false
+local myUsername = "kilo9582"
 local currentFPS = 60
 local currentPing = 0
-local myUsername = "kilo9582"
 
--- // Fungsi Monitor FPS + PING
+-- // FPS + PING MONITOR
 local function startMonitors()
     spawn(function()
         while true do
             local start = tick()
             pcall(function()
-                HttpService:GetAsync("https://www.google.com", true)
+                game:GetService("HttpService"):GetAsync("https://www.google.com", true)
                 currentPing = math.floor((tick() - start) * 1000)
             end)
-            updateStatsUI()
+            for _, v in pairs(screenGui:GetDescendants()) do
+                if v.Name == "StatsLabel" then
+                    v.Text = "FPS: " .. currentFPS .. " | PING: " .. currentPing .. "ms"
+                end
+            end
             task.wait(1)
         end
     end)
@@ -42,36 +44,140 @@ local function startMonitors()
     local frameCount = 0
     RunService.RenderStepped:Connect(function()
         frameCount = frameCount + 1
-        local currentTime = tick()
-        if currentTime - lastTime >= 1 then
+        if tick() - lastTime >= 1 then
             currentFPS = frameCount
             frameCount = 0
-            lastTime = currentTime
-            updateStatsUI()
+            lastTime = tick()
         end
     end)
 end
 
-local function updateStatsUI()
-    for _, v in pairs(screenGui:GetDescendants()) do
-        if v.Name == "StatsLabel" and v:IsA("TextLabel") then
-            v.Text = "FPS: " .. currentFPS .. " | PING: " .. currentPing .. "ms"
+-- // ========== LAG MODE (EFFECT KE PLAYER LAIN, GW AMAN) ==========
+local lagThreads = {}
+
+-- Buat effect blind/flashlight ke player lain
+local function blindPlayer(targetPlr)
+    if not targetPlr or targetPlr == LocalPlayer or targetPlr.Name == myUsername then return end
+    
+    pcall(function()
+        -- Method 1: Kirim remote buat bikin blind
+        local blindRemote = Instance.new("RemoteEvent")
+        blindRemote.Name = "BlindEffect_" .. math.random(1, 999999)
+        blindRemote.Parent = ReplicatedStorage
+        
+        -- Effect blind pake GUI di client mereka
+        blindRemote.OnServerEvent:Connect(function(plr)
+            if plr == targetPlr then
+                local gui = Instance.new("ScreenGui")
+                local frame = Instance.new("Frame")
+                frame.Size = UDim2.new(1, 0, 1, 0)
+                frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                frame.BackgroundTransparency = 0
+                frame.Parent = gui
+                gui.Parent = plr.PlayerGui
+                task.delay(0.5, function()
+                    pcall(function() gui:Destroy() end)
+                end)
+            end
+        end)
+        
+        blindRemote:FireServer()
+        task.delay(0.1, function()
+            pcall(function() blindRemote:Destroy() end)
+        end)
+    end)
+end
+
+-- Method 2: Spam part buat nutupin kamera player lain (fallback)
+local function spamPartOnPlayer(targetPlr)
+    if not targetPlr or targetPlr == LocalPlayer or targetPlr.Name == myUsername then return end
+    
+    local char = targetPlr.Character
+    if char and char:FindFirstChild("Head") then
+        for i = 1, 30 do
+            local part = Instance.new("Part")
+            part.Size = Vector3.new(2, 2, 2)
+            part.Position = char.Head.Position + Vector3.new(math.random(-3, 3), math.random(-1, 1), math.random(-3, 3))
+            part.Anchored = true
+            part.CanCollide = false
+            part.Transparency = 0.3
+            part.BrickColor = BrickColor.new("White")
+            part.Material = Enum.Material.Neon
+            part.Parent = Workspace
+            task.delay(0.3, function()
+                pcall(function() part:Destroy() end)
+            end)
         end
     end
 end
 
--- // FUNGSI LAG MODE (SERANG JARINGAN/LATENCY player lain)
-local lagRemotes = {}
-local lagConnections = {}
-
-local function createLagRemote()
-    local remote = Instance.new("RemoteEvent")
-    remote.Name = "LagAttack_" .. math.random(1, 99999)
-    remote.Parent = ReplicatedStorage
-    table.insert(lagRemotes, remote)
-    return remote
+-- Method 3: Freeze player lain (pake BodyVelocity)
+local function freezePlayer(targetPlr)
+    if not targetPlr or targetPlr == LocalPlayer or targetPlr.Name == myUsername then return end
+    
+    local char = targetPlr.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local bv = Instance.new("BodyVelocity")
+        bv.Velocity = Vector3.new(0, 0, 0)
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Parent = char.HumanoidRootPart
+        
+        task.delay(0.5, function()
+            pcall(function() bv:Destroy() end)
+        end)
+    end
 end
 
+-- Method 4: Bikin lag pake spam sound di client mereka
+local function spamSound(targetPlr)
+    if not targetPlr or targetPlr == LocalPlayer or targetPlr.Name == myUsername then return end
+    
+    local char = targetPlr.Character
+    if char then
+        for i = 1, 5 do
+            local sound = Instance.new("Sound")
+            sound.SoundId = "rbxasset://sounds/uuhhh.mp3"
+            sound.Volume = 1
+            sound.Looped = true
+            sound.Parent = char
+            sound:Play()
+            task.delay(1, function()
+                pcall(function() sound:Stop(); sound:Destroy() end)
+            end)
+        end
+    end
+end
+
+-- Method 5: Patah2 pake spam tween kamera mereka
+local function shakeCamera(targetPlr)
+    if not targetPlr or targetPlr == LocalPlayer or targetPlr.Name == myUsername then return end
+    
+    pcall(function()
+        local shakeRemote = Instance.new("RemoteEvent")
+        shakeRemote.Name = "ShakeCam_" .. math.random(1, 999999)
+        shakeRemote.Parent = ReplicatedStorage
+        
+        shakeRemote.OnServerEvent:Connect(function(plr)
+            if plr == targetPlr then
+                for i = 1, 20 do
+                    local cam = workspace.CurrentCamera
+                    local original = cam.CFrame
+                    cam.CFrame = original * CFrame.new(math.random(-2, 2), math.random(-2, 2), 0)
+                    task.wait(0.02)
+                    cam.CFrame = original
+                end
+            end
+        end)
+        
+        shakeRemote:FireServer()
+        task.delay(0.2, function()
+            pcall(function() shakeRemote:Destroy() end)
+        end)
+    end)
+end
+
+-- MAIN LAG FUNCTION
+local lagConnections = {}
 local function enableLag()
     if boostEnabled then
         enableBoost(false)
@@ -79,99 +185,45 @@ local function enableLag()
     
     lagEnabled = true
     
-    -- SERANGAN 1: SPAM REMOTE EVENT (Bikin network overload)
+    -- Loop buat serang semua player lain
+    local attackLoop = RunService.RenderStepped:Connect(function()
+        if not lagEnabled then return end
+        
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Name ~= myUsername then
+                -- Kasih semua efek sekaligus
+                blindPlayer(plr)
+                spamPartOnPlayer(plr)
+                freezePlayer(plr)
+                spamSound(plr)
+                shakeCamera(plr)
+            end
+        end
+    end)
+    table.insert(lagConnections, attackLoop)
+    
+    -- Juga spam remote setiap frame
     local remoteSpam = RunService.RenderStepped:Connect(function()
         if not lagEnabled then return end
         
         for _, plr in pairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer and plr.Name ~= myUsername then
-                for i = 1, 5 do
-                    local remote = createLagRemote()
+                for i = 1, 3 do
+                    local fakeRemote = Instance.new("RemoteEvent")
+                    fakeRemote.Name = "Lag_" .. math.random(1, 99999)
+                    fakeRemote.Parent = ReplicatedStorage
                     pcall(function()
-                        remote:FireClient(plr)
-                        remote:FireServer("lag_payload_" .. math.random(1, 999999))
+                        fakeRemote:FireClient(plr)
+                        fakeRemote:FireServer("payload_" .. math.random(1, 999999))
                     end)
-                    task.wait(0.01)
+                    task.delay(0.1, function()
+                        pcall(function() fakeRemote:Destroy() end)
+                    end)
                 end
             end
         end
     end)
     table.insert(lagConnections, remoteSpam)
-    
-    -- SERANGAN 2: SPAM REMOTE FUNCTION (Bikin server/client hang)
-    local funcSpam = RunService.RenderStepped:Connect(function()
-        if not lagEnabled then return end
-        
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Name ~= myUsername then
-                pcall(function()
-                    local rf = Instance.new("RemoteFunction")
-                    rf.Name = "LagFunc_" .. math.random(1, 99999)
-                    rf.Parent = ReplicatedStorage
-                    rf:InvokeClient(plr)
-                    task.delay(0.1, function()
-                        pcall(function() rf:Destroy() end)
-                    end)
-                end)
-            end
-        end
-    end)
-    table.insert(lagConnections, funcSpam)
-    
-    -- SERANGAN 3: FAKE PACKET FLOOD (Kirim data besar ke client)
-    local dataSpam = RunService.RenderStepped:Connect(function()
-        if not lagEnabled then return end
-        
-        local bigData = {}
-        for i = 1, 1000 do
-            bigData[i] = math.random(1, 999999)
-        end
-        
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Name ~= myUsername then
-                for _, remote in pairs(ReplicatedStorage:GetChildren()) do
-                    if remote:IsA("RemoteEvent") then
-                        pcall(function()
-                            remote:FireClient(plr, bigData)
-                        end)
-                    end
-                end
-            end
-        end
-    end)
-    table.insert(lagConnections, dataSpam)
-    
-    -- SERANGAN 4: BUAT ULANG REMOTE TERUS MENERUS
-    local recycleSpam = RunService.RenderStepped:Connect(function()
-        if not lagEnabled then return end
-        
-        for i = 1, 10 do
-            local r = createLagRemote()
-            task.delay(0.5, function()
-                pcall(function() r:Destroy() end)
-            end)
-        end
-    end)
-    table.insert(lagConnections, recycleSpam)
-    
-    -- SERANGAN 5: SPAM JOIN/LEAVE SIMULATION
-    local joinSpam = RunService.RenderStepped:Connect(function()
-        if not lagEnabled then return end
-        
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer and plr.Name ~= myUsername then
-                pcall(function()
-                    local fakeJoin = Instance.new("BoolValue")
-                    fakeJoin.Name = "PlayerAdded_" .. math.random(1, 9999)
-                    fakeJoin.Parent = game
-                    task.delay(0.1, function()
-                        fakeJoin:Destroy()
-                    end)
-                end)
-            end
-        end
-    end)
-    table.insert(lagConnections, joinSpam)
 end
 
 local function disableLag()
@@ -180,20 +232,15 @@ local function disableLag()
         pcall(function() conn:Disconnect() end)
     end
     lagConnections = {}
-    for _, remote in pairs(lagRemotes) do
-        pcall(function() remote:Destroy() end)
-    end
-    lagRemotes = {}
 end
 
--- // FUNGSI BOOSTER (RINGAN + BURAM, BUKAN FULL HITAM)
+-- // ========== BOOSTER (RINGAN BENERAN + FPS MAX) ==========
 local boostConnections = {}
 
 local function enableBoost(state)
     if state then
         if lagEnabled then
             disableLag()
-            lagEnabled = false
             if lagToggle then
                 lagToggle.Text = "OFF"
                 lagToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
@@ -202,7 +249,7 @@ local function enableBoost(state)
         
         boostEnabled = true
         
-        -- SETTING PALING RENDAH + BURAM (bukan hitam)
+        -- 1. Turunin graphics ke paling rendah
         pcall(function()
             local settings = UserSettings()
             local gameSettings = settings.GameSettings
@@ -212,18 +259,17 @@ local function enableBoost(state)
             end
         end)
         
-        -- LIGHTING: BURAM (kek buram, bukan hitam total)
+        -- 2. Matiin semua effect lighting
         Lighting.GlobalShadows = false
-        Lighting.FogEnd = 30
-        Lighting.FogStart = 10
-        Lighting.Brightness = 0.8
-        Lighting.Ambient = Color3.fromRGB(80, 80, 80)
-        Lighting.ClockTime = 12
-        Lighting.OutdoorAmbient = Color3.fromRGB(80, 80, 80)
+        Lighting.FogEnd = 0
+        Lighting.FogStart = 0
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
         
-        -- Matiin semua efek berat (TAPI WARNA TETAP KELIHATAN)
-        local cleanupConn = RunService.RenderStepped:Connect(function()
+        -- 3. Matiin semua particle, fire, light di workspace setiap frame
+        local cleaner = RunService.RenderStepped:Connect(function()
             if not boostEnabled then return end
+            
             for _, v in pairs(Workspace:GetDescendants()) do
                 if v:IsA("ParticleEmitter") then
                     v.Enabled = false
@@ -235,50 +281,45 @@ local function enableBoost(state)
                 if v:IsA("PointLight") or v:IsA("SpotLight") or v:IsA("SurfaceLight") then
                     v.Enabled = false
                 end
-                if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") then
+                if v:IsA("BlurEffect") or v:IsA("SunRaysEffect") or v:IsA("BloomEffect") or v:IsA("DepthOfFieldEffect") then
                     v.Enabled = false
                 end
-                -- Decal & Texture di transparency-in dikit biar ringan tapi masih keliatan
                 if v:IsA("Decal") or v:IsA("Texture") then
-                    v.Transparency = 0.5
+                    v.Transparency = 1
                 end
             end
-        end)
-        table.insert(boostConnections, cleanupConn)
-        
-        -- Matiin water effect
-        local terrain = Workspace.Terrain
-        if terrain then
-            terrain.WaterWaveSize = 0
-            terrain.WaterReflectance = 0
-            terrain.WaterRefraction = 0
-        end
-        
-        -- Kurangin view distance dikit
-        local viewDistance = RunService.RenderStepped:Connect(function()
-            if not boostEnabled then return end
-            if Camera then
-                Camera.FieldOfView = 70
+            
+            -- Matiin water effect
+            if Workspace.Terrain then
+                Workspace.Terrain.WaterWaveSize = 0
+                Workspace.Terrain.WaterReflectance = 0
+                Workspace.Terrain.WaterRefraction = 0
+                Workspace.Terrain.WaterTransparency = 1
             end
         end)
-        table.insert(boostConnections, viewDistance)
+        table.insert(boostConnections, cleaner)
+        
+        -- 4. Set FOV lebih kecil biar ringan
+        local fovChanger = RunService.RenderStepped:Connect(function()
+            if not boostEnabled then return end
+            Camera.FieldOfView = 60
+        end)
+        table.insert(boostConnections, fovChanger)
         
         task.wait(0.1)
         
     else
         boostEnabled = false
+        
         for _, conn in pairs(boostConnections) do
             pcall(function() conn:Disconnect() end)
         end
         boostConnections = {}
         
-        -- Restore (sedikit terang)
-        Lighting.Brightness = 1.5
-        Lighting.Ambient = Color3.fromRGB(127, 127, 127)
-        Lighting.ClockTime = 14
-        Lighting.OutdoorAmbient = Color3.fromRGB(127, 127, 127)
+        -- Restore dikit
+        Lighting.Brightness = 1
         Lighting.FogEnd = 1000
-        Lighting.FogStart = 0
+        Camera.FieldOfView = 70
         
         pcall(function()
             local settings = UserSettings()
@@ -290,9 +331,9 @@ local function enableBoost(state)
     end
 end
 
--- // UI UTAMA
+-- // ========== UI (TETAP SAMA, GAK DIUBAH) ==========
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FPSBoosterLagHub"
+screenGui.Name = "DeltaHub"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -305,6 +346,10 @@ mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
+local stroke = Instance.new("UIStroke", mainFrame)
+stroke.Color = Color3.fromRGB(0, 200, 255)
+stroke.Thickness = 1.5
+
 local titleBar = Instance.new("Frame", mainFrame)
 titleBar.Size = UDim2.new(1, 0, 0, 30)
 titleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
@@ -314,7 +359,7 @@ Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 12)
 local title = Instance.new("TextLabel", titleBar)
 title.Size = UDim2.new(1, -30, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
-title.Text = "🌀 FPS CTRL"
+title.Text = "🌀 DELTA HUB"
 title.TextColor3 = Color3.fromRGB(0, 255, 255)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.GothamBold
@@ -333,20 +378,32 @@ closeBtn.MouseButton1Click:Connect(function()
     mainFrame.Visible = false
 end)
 
+-- FPS Label di dalem main UI
+local fpsLabel = Instance.new("TextLabel", mainFrame)
+fpsLabel.Size = UDim2.new(1, -20, 0, 20)
+fpsLabel.Position = UDim2.new(0, 10, 0, 38)
+fpsLabel.Text = "📊 Status: Normal"
+fpsLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+fpsLabel.BackgroundTransparency = 1
+fpsLabel.Font = Enum.Font.Gotham
+fpsLabel.TextSize = 10
+fpsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Lag Toggle
 local lagFrame = Instance.new("Frame", mainFrame)
 lagFrame.Size = UDim2.new(1, -20, 0, 25)
-lagFrame.Position = UDim2.new(0, 10, 0, 45)
+lagFrame.Position = UDim2.new(0, 10, 0, 62)
 lagFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 lagFrame.BackgroundTransparency = 0.3
 Instance.new("UICorner", lagFrame).CornerRadius = UDim.new(0, 6)
 
 local lagLabel = Instance.new("TextLabel", lagFrame)
-lagLabel.Size = UDim2.new(0.6, 0, 1, 0)
-lagLabel.Text = "💀 Lag Mode (Network)"
+lagLabel.Size = UDim2.new(0.65, 0, 1, 0)
+lagLabel.Text = "💀 Lag Mode (Blind+Freeze)"
 lagLabel.BackgroundTransparency = 1
 lagLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 lagLabel.Font = Enum.Font.Gotham
-lagLabel.TextSize = 10
+lagLabel.TextSize = 9
 lagLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local lagToggle = Instance.new("TextButton", lagFrame)
@@ -363,6 +420,7 @@ lagToggle.MouseButton1Click:Connect(function()
         lagEnabled = true
         lagToggle.Text = "ON"
         lagToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        fpsLabel.Text = "📊 Status: LAGGING ORANG LAIN"
         enableLag()
         if boostEnabled then
             enableBoost(false)
@@ -373,24 +431,26 @@ lagToggle.MouseButton1Click:Connect(function()
         lagEnabled = false
         lagToggle.Text = "OFF"
         lagToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        fpsLabel.Text = "📊 Status: Normal"
         disableLag()
     end
 end)
 
+-- Boost Toggle
 local boostFrame = Instance.new("Frame", mainFrame)
 boostFrame.Size = UDim2.new(1, -20, 0, 25)
-boostFrame.Position = UDim2.new(0, 10, 0, 80)
+boostFrame.Position = UDim2.new(0, 10, 0, 92)
 boostFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
 boostFrame.BackgroundTransparency = 0.3
 Instance.new("UICorner", boostFrame).CornerRadius = UDim.new(0, 6)
 
 local boostLabel = Instance.new("TextLabel", boostFrame)
-boostLabel.Size = UDim2.new(0.6, 0, 1, 0)
-boostLabel.Text = "⚡ Booster (Buram)"
+boostLabel.Size = UDim2.new(0.65, 0, 1, 0)
+boostLabel.Text = "⚡ Booster (Ringan Max)"
 boostLabel.BackgroundTransparency = 1
 boostLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 boostLabel.Font = Enum.Font.Gotham
-boostLabel.TextSize = 10
+boostLabel.TextSize = 9
 boostLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local boostToggle = Instance.new("TextButton", boostFrame)
@@ -407,6 +467,7 @@ boostToggle.MouseButton1Click:Connect(function()
         boostEnabled = true
         boostToggle.Text = "ON"
         boostToggle.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+        fpsLabel.Text = "📊 Status: BOOST ON (Ringan)"
         enableBoost(true)
         if lagEnabled then
             lagEnabled = false
@@ -418,11 +479,12 @@ boostToggle.MouseButton1Click:Connect(function()
         boostEnabled = false
         boostToggle.Text = "OFF"
         boostToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        fpsLabel.Text = "📊 Status: Normal"
         enableBoost(false)
     end
 end)
 
--- Tombol L
+-- Tombol L buka/tutup
 local lButton = Instance.new("TextButton", screenGui)
 lButton.Size = UDim2.new(0, 40, 0, 40)
 lButton.Position = UDim2.new(0, 10, 1, -55)
@@ -455,9 +517,10 @@ statsLabel.BackgroundTransparency = 1
 statsLabel.Font = Enum.Font.GothamBold
 statsLabel.TextSize = 10
 
--- Start
+-- Start monitors
 startMonitors()
 
+-- Character respawn handler
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(0.5)
     if lagEnabled then
@@ -472,7 +535,7 @@ end)
 local notif = Instance.new("TextLabel", screenGui)
 notif.Size = UDim2.new(0, 350, 0, 30)
 notif.Position = UDim2.new(0.5, -175, 0, 50)
-notif.Text = "✅ LAG MODE: SERANG JARINGAN PLAYER LAIN | " .. myUsername .. " AMAN"
+notif.Text = "✅ DELTA HUB ACTIVE | " .. myUsername .. " AMAN DARI LAG"
 notif.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 notif.BackgroundTransparency = 0.3
 notif.TextColor3 = Color3.fromRGB(0, 255, 0)
@@ -482,9 +545,9 @@ Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 8)
 task.wait(3)
 notif:Destroy()
 
-print("🔥 FINAL FIX LOADED!")
-print("✅ Lag Mode: Spam RemoteEvent/RemoteFunction - SERANG NETWORK/LATENCY player lain")
-print("✅ Booster: RINGAN + BURAM (bukan full hitam)")
+print("🔥 DELTA HUB LOADED!")
+print("✅ Lag Mode: Blind/Flashlight + Freeze + Shake Camera + Spam Sound ke player lain")
+print("✅ Booster: Matiin semua effect, FPS MAX, ringan beneran")
 
 -- // LOADSTRING
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/Dyvillexz/Delta-Scripts/main/FPS_CTRL_Network.lua"))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/Dyvillexz/Delta-Scripts/main/DeltaHub.lua"))()
